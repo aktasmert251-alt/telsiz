@@ -332,6 +332,8 @@ p { margin: 0; }
   background-repeat: no-repeat;
 }
 .err { font-size: 15px; line-height: 1.5; color: var(--bad); }
+.diag { font: 400 11px/1.5 var(--mono); color: var(--muted); overflow-wrap: anywhere; }
+.diag:empty { display: none; }
 
 .manual { border-top: 1px solid var(--line); }
 .manual summary {
