@@ -722,7 +722,10 @@ function pairFail(peer) {
   const state = peer.pc.iceConnectionState;
   const d = pair.diag;
   discardPending();
-  pairError('Bağlantı kurulamadı. İki cihaz aynı Wi‑Fi\'da ya da aynı hotspot\'ta mı? Kontrol edip baştan deneyin.');
+  const hidden = d && addrsOf(d.theirs) === 'gizli ad';
+  pairError(hidden
+    ? 'Bağlantı kurulamadı. Karşı cihaz adresini gizli gönderdi. O cihazda Telsiz\'e kamera izni verip baştan deneyin.'
+    : 'Bağlantı kurulamadı. İki cihaz aynı Wi‑Fi\'da ya da aynı hotspot\'ta mı? Kontrol edip baştan deneyin.');
   if (d) $('#err-diag').textContent = 'Bu cihaz: ' + addrsOf(d.mine) + ' · Karşı cihaz: ' + addrsOf(d.theirs) + ' · durum: ' + state;
 }
 function pairError(e) {
@@ -761,9 +764,9 @@ function onPeerOpen(peer) {
   const mine = (pair.offer && pair.offer.peer === peer) || (pair.answer && pair.answer.peer === peer);
   if (mine) { toast('Bağlantı kuruldu.'); closePair(); }
 }
-function armTimeout(peer) {
+function armTimeout(peer, ms) {
   clearTimeout(pair.timer);
-  pair.timer = setTimeout(() => { if (!peer.open) pairFail(peer); }, 30000);
+  pair.timer = setTimeout(() => { if (!peer.open) pairFail(peer); }, ms);
 }
 
 async function startCamera() {
@@ -814,6 +817,12 @@ function showOwnCode(code, step) {
     : 'Bu cevap kodunu ilk cihaza okutun. Bağlantı kendiliğinden kurulur.';
   $('#show-next').hidden = step !== 1;
   $('#show-wait').hidden = step === 1;
+  const mine = addrsOf(code);
+  const diag = $('#show-diag');
+  diag.classList.toggle('warn', mine === 'gizli ad');
+  diag.textContent = mine === 'gizli ad'
+    ? 'Uyarı: bu cihazın adresi gizli, bağlantı kurulamayabilir. Kamera iznini verip BAĞLAN\'ı yeniden açın.'
+    : 'Bu cihazın adresi: ' + mine;
   showPane('show');
 }
 async function goShow() {
@@ -900,12 +909,13 @@ async function handleCode(text) {
       if (!pair.open) { discardPending(); return true; }
       pair.diag = { mine: pair.answer.code, theirs: flat };
       showOwnCode(pair.answer.code, 2);
-      armTimeout(pair.answer.peer);
+      // Cevap kodunun karşı cihaza okutulması zaman alır; acele ettirme.
+      armTimeout(pair.answer.peer, 180000);
     } else {
       busy('Bağlanıyor…');
       pair.diag = { mine: pair.offer.code, theirs: flat };
       await acceptAnswer(pair.offer.peer, d);
-      armTimeout(pair.offer.peer);
+      armTimeout(pair.offer.peer, 30000);
     }
   } catch (e) {
     discardPending();
