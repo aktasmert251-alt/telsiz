@@ -1,0 +1,17 @@
+{
+  "name": "Telsiz",
+  "short_name": "Telsiz",
+  "description": "İnternet olmadan, cihazdan cihaza mesaj ve dosya.",
+  "lang": "tr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#EDE9DE",
+  "theme_color": "#1B1A16",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
