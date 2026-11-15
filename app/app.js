@@ -370,8 +370,10 @@ function encodeDesc(desc, kind) {
   // IPv4 önce, sonra .local (gizlenmiş yerel adres), en son IPv6
   const rank = c => (/^\d+\.\d+\.\d+\.\d+@/.test(c) ? 0 : c.includes('.local@') ? 1 : 2);
   cands.sort((a, b) => rank(a) - rank(b));
+  // Gerçek IPv4 adresi varsa yalnız onları gönder: kod küçülür, kamerayla okumak kolaylaşır.
+  const v4 = cands.filter(c => rank(c) === 0);
   const fpBytes = Uint8Array.from(fp.split(':').map(h => parseInt(h, 16)));
-  return ['TLSZ1', kind, ufrag, pwd, b64url(fpBytes), setup, cands.slice(0, 5).join(',')].join('|');
+  return ['TLSZ1', kind, ufrag, pwd, b64url(fpBytes), setup, (v4.length ? v4 : cands).slice(0, 3).join(',')].join('|');
 }
 function decodeCode(text) {
   const p = String(text).replace(/\s+/g, '').split('|');
@@ -418,6 +420,7 @@ function newPeer() {
   const pc = new RTCPeerConnection({ iceServers: [] });
   const peer = { key: rid(4), pc, dc: null, id: '', name: 'Cihaz', kind: 'tel', open: false, dead: false, outQ: [], busy: false, rx: null, accept: new Map() };
   pc.onconnectionstatechange = () => {
+    if (pc.connectionState === 'failed' && !peer.open) pairFail(peer);
     if (pc.connectionState === 'failed' || pc.connectionState === 'closed') dropPeer(peer, true);
   };
   return peer;
@@ -693,7 +696,7 @@ function renderPeers() {
 function renderMe() { $('#me-name').textContent = me.name || '—'; }
 
 /* ---------- eşleşme ekranı ---------- */
-const pair = { open: false, pane: 'menu', offer: null, answer: null, timer: 0, working: false };
+const pair = { open: false, pane: 'menu', offer: null, answer: null, timer: 0, working: false, diag: null };
 let cam = null;
 let scanning = false;
 const SCAN_TEXT = 'Karşı cihazın ekranındaki kodu çerçeveye getir.';
@@ -708,8 +711,23 @@ function scanNote(text) {
   $('#scan-text').textContent = text;
   if (pair.pane !== 'scan') toast(text);
 }
+const addrsOf = code => {
+  const d = decodeCode(code);
+  return d ? d.cands.map(c => (c.addr.endsWith('.local') ? 'gizli ad' : c.addr)).join(', ') : '?';
+};
+// Eşleşme sırasında bağlantı kurulamadı: nedenini bulmaya yarayacak adresleri de göster.
+function pairFail(peer) {
+  const mine = (pair.offer && pair.offer.peer === peer) || (pair.answer && pair.answer.peer === peer);
+  if (!pair.open || !mine) return;
+  const state = peer.pc.iceConnectionState;
+  const d = pair.diag;
+  discardPending();
+  pairError('Bağlantı kurulamadı. İki cihaz aynı Wi‑Fi\'da ya da aynı hotspot\'ta mı? Kontrol edip baştan deneyin.');
+  if (d) $('#err-diag').textContent = 'Bu cihaz: ' + addrsOf(d.mine) + ' · Karşı cihaz: ' + addrsOf(d.theirs) + ' · durum: ' + state;
+}
 function pairError(e) {
   clearTimeout(pair.timer);
+  $('#err-diag').textContent = '';
   $('#err-text').textContent = e instanceof NoNetworkError
     ? 'Bu cihaz bir ağa bağlı görünmüyor. Wi‑Fi\'ı aç, karşı cihazla aynı ağa ya da hotspot\'a bağlan ve tekrar dene.'
     : (typeof e === 'string' ? e : 'Kod işlenemedi. Baştan deneyin.');
@@ -745,17 +763,13 @@ function onPeerOpen(peer) {
 }
 function armTimeout(peer) {
   clearTimeout(pair.timer);
-  pair.timer = setTimeout(() => {
-    if (peer.open || !pair.open) return;
-    discardPending();
-    pairError('Bağlantı kurulamadı. İki cihaz aynı Wi‑Fi\'da ya da aynı hotspot\'ta mı? Kontrol edip baştan deneyin.');
-  }, 30000);
+  pair.timer = setTimeout(() => { if (!peer.open) pairFail(peer); }, 30000);
 }
 
 async function startCamera() {
   if (cam) return cam;
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('nocam');
-  const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 } }, audio: false });
+  const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false });
   if (!pair.open) { s.getTracks().forEach(t => t.stop()); throw new Error('closed'); }
   cam = s;
   return cam;
@@ -767,7 +781,7 @@ function stopCamera() {
 }
 
 function renderQR(box, text) {
-  const q = qrcode(0, 'M');
+  const q = qrcode(0, 'L');   // ekrandan okunuyor; düşük hata payı = daha iri kareler
   q.addData(text, 'Byte');
   q.make();
   const n = q.getModuleCount();
@@ -847,7 +861,7 @@ async function scanLoop(v) {
         try { const r = await detector.detect(v); if (r.length) text = r[0].rawValue; } catch { detector = null; }
       }
       if (!detector) {
-        const k = Math.min(1, 640 / Math.max(v.videoWidth, v.videoHeight));
+        const k = Math.min(1, 1280 / Math.max(v.videoWidth, v.videoHeight));
         canvas.width = Math.round(v.videoWidth * k);
         canvas.height = Math.round(v.videoHeight * k);
         ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
@@ -884,10 +898,12 @@ async function handleCode(text) {
       discardPending();
       pair.answer = await acceptOffer(d);
       if (!pair.open) { discardPending(); return true; }
+      pair.diag = { mine: pair.answer.code, theirs: flat };
       showOwnCode(pair.answer.code, 2);
       armTimeout(pair.answer.peer);
     } else {
       busy('Bağlanıyor…');
+      pair.diag = { mine: pair.offer.code, theirs: flat };
       await acceptAnswer(pair.offer.peer, d);
       armTimeout(pair.offer.peer);
     }
