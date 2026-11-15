@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; media-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'none'">
+<title>Telsiz</title>
+<meta name="description" content="İnternet olmadan, cihazdan cihaza mesaj ve dosya.">
+<meta name="theme-color" content="#EDE9DE" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#131410" media="(prefers-color-scheme: dark)">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Telsiz">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<svg class="sprite" aria-hidden="true" focusable="false">
+  <symbol id="i-clip" viewBox="0 0 24 24"><path d="M21 11.5l-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.6-8.6a3.7 3.7 0 0 1 5.2 5.2l-8.5 8.5a1.8 1.8 0 0 1-2.6-2.6l7.8-7.8"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+  <symbol id="i-phone" viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 17.5h2"/></symbol>
+  <symbol id="i-laptop" viewBox="0 0 24 24"><path d="M5 6h14v10H5zM2.5 19h19"/></symbol>
+</svg>
+
+<div class="app">
+
+  <aside class="rail" id="rail" aria-label="Cihazlar ve ayarlar">
+    <div class="rail-top">
+      <div class="mark">
+        <span class="mark-name">TELSİZ</span>
+        <span class="mark-sub">internetsiz mesaj ve dosya</span>
+      </div>
+      <button class="icon-btn only-mobile" id="rail-close" type="button" aria-label="Kapat"><svg class="ic"><use href="#i-close"/></svg></button>
+    </div>
+
+    <section class="block">
+      <h2 class="label">Bu cihaz</h2>
+      <div class="me">
+        <span class="me-name" id="me-name">—</span>
+        <button class="link" id="me-edit" type="button">DEĞİŞTİR</button>
+      </div>
+      <p class="state" id="offline-state"><i class="led"></i><span>Çevrimdışı kullanım hazırlanıyor…</span></p>
+      <button class="btn btn-wide" id="install" type="button" hidden>UYGULAMA OLARAK KUR</button>
+      <p class="note" id="ios-hint" hidden>iPhone'da kurmak için: Safari'de Paylaş düğmesi → “Ana Ekrana Ekle”.</p>
+    </section>
+
+    <section class="block">
+      <h2 class="label">Bağlı cihazlar <span id="peer-count"></span></h2>
+      <ul class="peers" id="peers"></ul>
+      <button class="btn btn-accent btn-wide" id="rail-pair" type="button">CİHAZ BAĞLA</button>
+    </section>
+
+    <section class="block">
+      <h2 class="label">Nasıl bağlanır</h2>
+      <ol class="steps">
+        <li>İki cihaz aynı Wi‑Fi'a bağlanır. Wi‑Fi yoksa bir telefon hotspot açar, diğeri ona bağlanır. İnternet gerekmez.</li>
+        <li>Bir cihaz <b>KOD GÖSTER</b>'e, diğeri <b>KOD OKUT</b>'a basar.</li>
+        <li>Kodlar karşılıklı okutulur; bağlantı doğrudan iki cihaz arasında kurulur.</li>
+      </ol>
+      <p class="note">Bağlantı yokken yazdıkların saklanır, ilk bağlantıda kendiliğinden gider. Bağlıyken ekranı açık tut.</p>
+    </section>
+
+    <section class="block block-last">
+      <button class="link danger" id="wipe" type="button">GEÇMİŞİ BU CİHAZDAN SİL</button>
+    </section>
+  </aside>
+  <div class="scrim" id="scrim" hidden></div>
+
+  <main class="chat">
+    <header class="bar">
+      <button class="icon-btn only-mobile" id="rail-open" type="button" aria-label="Cihazlar ve ayarlar"><svg class="ic"><use href="#i-menu"/></svg></button>
+      <div class="bar-id">
+        <span class="bar-name only-mobile">TELSİZ</span>
+        <span class="readout" id="readout"><i class="led"></i><span id="readout-text">BAĞLI DEĞİL</span></span>
+      </div>
+      <button class="btn btn-accent" id="bar-pair" type="button">BAĞLAN</button>
+    </header>
+
+    <div class="stream" id="stream" role="log" aria-live="polite" aria-label="Mesajlar"></div>
+    <button class="jump" id="jump" type="button" hidden>YENİ MESAJ ↓</button>
+
+    <div class="transfers" id="transfers"></div>
+
+    <form class="composer" id="composer" autocomplete="off">
+      <button class="icon-btn" id="attach" type="button" aria-label="Dosya ekle"><svg class="ic"><use href="#i-clip"/></svg></button>
+      <input type="file" id="file-input" multiple hidden>
+      <textarea id="text" rows="1" maxlength="4000" placeholder="Mesaj yaz…" aria-label="Mesaj"></textarea>
+      <button class="icon-btn send" id="send" type="submit" aria-label="Gönder"><svg class="ic"><use href="#i-send"/></svg></button>
+    </form>
+  </main>
+</div>
+
+<div class="sheet" id="pair" role="dialog" aria-modal="true" aria-labelledby="pair-title" hidden>
+  <div class="card">
+    <header class="card-head">
+      <h2 id="pair-title">CİHAZ BAĞLA</h2>
+      <button class="icon-btn" id="pair-close" type="button" aria-label="Kapat"><svg class="ic"><use href="#i-close"/></svg></button>
+    </header>
+
+    <section class="pane" data-pane="menu">
+      <p class="lead">İki cihaz aynı Wi‑Fi'da ya da aynı hotspot'ta olmalı. İnternet gerekmez.</p>
+      <div class="choices">
+        <button class="choice" id="go-show" type="button">
+          <span class="choice-t">KOD GÖSTER</span>
+          <span class="choice-d">Bu cihaz kodu gösterir, karşı cihaz okutur.</span>
+        </button>
+        <button class="choice" id="go-scan" type="button">
+          <span class="choice-t">KOD OKUT</span>
+          <span class="choice-d">Karşı cihazın ekranındaki kodu kamerayla okut.</span>
+        </button>
+      </div>
+      <p class="note">Ortak ağ yoksa bir telefonda hotspot (kişisel erişim noktası) aç, diğer cihaz ona bağlansın.</p>
+    </section>
+
+    <section class="pane center" data-pane="busy" hidden>
+      <span class="spinner"></span>
+      <p class="lead" id="busy-text">Kod hazırlanıyor…</p>
+    </section>
+
+    <section class="pane center" data-pane="show" hidden>
+      <span class="stepno" id="show-step">ADIM 1 / 2</span>
+      <div class="qr" id="qr"></div>
+      <p class="lead" id="show-text"></p>
+      <button class="btn btn-accent btn-wide" id="show-next" type="button">CEVAP KODUNU OKUT</button>
+      <p class="waiting" id="show-wait" hidden><span class="spinner sm"></span>Bağlantı bekleniyor…</p>
+    </section>
+
+    <section class="pane center" data-pane="scan" hidden>
+      <div class="finder"><video id="cam" playsinline muted></video><i class="finder-frame"></i></div>
+      <p class="lead" id="scan-text">Karşı cihazın ekranındaki kodu çerçeveye getir.</p>
+    </section>
+
+    <section class="pane center" data-pane="error" hidden>
+      <p class="err" id="err-text"></p>
+      <button class="btn btn-wide" id="err-retry" type="button">BAŞA DÖN</button>
+    </section>
+
+    <details class="manual" id="manual">
+      <summary>Kamera yok mu? Kodu elle aktar</summary>
+      <div class="manual-body">
+        <div id="manual-own" hidden>
+          <label class="label" for="code-out">Bu cihazın kodu</label>
+          <textarea id="code-out" rows="3" readonly></textarea>
+          <button class="btn btn-sm" id="code-copy" type="button">KOPYALA</button>
+        </div>
+        <label class="label" for="code-in">Karşı cihazın kodu</label>
+        <textarea id="code-in" rows="3" spellcheck="false" autocapitalize="off" placeholder="TLSZ1|…"></textarea>
+        <button class="btn btn-sm" id="code-apply" type="button">UYGULA</button>
+      </div>
+    </details>
+  </div>
+</div>
+
+<div class="sheet" id="namebox" role="dialog" aria-modal="true" aria-labelledby="name-title" hidden>
+  <form class="card card-sm" id="name-form">
+    <header class="card-head"><h2 id="name-title">BU CİHAZIN ADI</h2></header>
+    <section class="pane">
+      <p class="lead">Karşı taraf seni bu adla görecek.</p>
+      <input id="name-input" type="text" maxlength="24" placeholder="Örn. Mert'in telefonu" autocomplete="off" required>
+      <button class="btn btn-accent btn-wide" type="submit">KAYDET</button>
+    </section>
+  </form>
+</div>
+
+<div class="lightbox" id="lightbox" hidden><img alt=""></div>
+<div class="drop" id="drop" hidden><span>BIRAK, GÖNDERİLSİN</span></div>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script src="vendor/qrcode.js"></script>
+<script src="vendor/jsQR.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
