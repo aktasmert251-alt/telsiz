@@ -404,7 +404,14 @@ function buildSdp(d) {
     'm=application 9 UDP/DTLS/SCTP webrtc-datachannel',
     'c=IN IP4 0.0.0.0',
   ];
-  d.cands.forEach((c, i) => L.push('a=candidate:' + (i + 1) + ' 1 udp ' + (2113937151 - i) + ' ' + c.addr + ' ' + c.port + ' typ host generation 0'));
+  // Hotspot açan iPhone kendi hotspot adresini bildirmiyor (hep 172.20.10.1'dir); tahmini aday olarak ekle.
+  const cands = d.cands.slice();
+  for (const c of d.cands) {
+    if (/^\d+\.\d+\.\d+\.\d+$/.test(c.addr) && !c.addr.startsWith('172.20.10.') && !cands.some(x => x.addr === '172.20.10.1' && x.port === c.port)) {
+      cands.push({ addr: '172.20.10.1', port: c.port });
+    }
+  }
+  cands.forEach((c, i) => L.push('a=candidate:' + (i + 1) + ' 1 udp ' + (2113937151 - i) + ' ' + c.addr + ' ' + c.port + ' typ host generation 0'));
   L.push(
     'a=ice-ufrag:' + d.ufrag,
     'a=ice-pwd:' + d.pwd,

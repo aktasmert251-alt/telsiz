@@ -1,5 +1,5 @@
 /* Telsiz service worker: uygulamayı cihaza kaydeder, internet olmadan açılmasını sağlar. */
-const VERSION = 'telsiz-v4';
+const VERSION = 'telsiz-v5';
 const ASSETS = [
   './',
   'index.html',
