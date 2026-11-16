@@ -366,6 +366,8 @@ function encodeDesc(desc, kind) {
     const c = m[2] + '@' + m[3];
     if (!cands.includes(c)) cands.push(c);
   }
+  // 169.254.x.x: ağa bağlı olmayan bir bağdaştırıcının kendine verdiği adres; işe yaramaz.
+  for (let i = cands.length - 1; i >= 0; i--) if (cands[i].startsWith('169.254.')) cands.splice(i, 1);
   if (!cands.length) throw new NoNetworkError();
   // IPv4 önce, sonra .local (gizlenmiş yerel adres), en son IPv6
   const rank = c => (/^\d+\.\d+\.\d+\.\d+@/.test(c) ? 0 : c.includes('.local@') ? 1 : 2);
